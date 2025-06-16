@@ -159,10 +159,6 @@ if [[ ! -z $workspace ]]; then
     fi
 fi
 
-echo "workspace: $workspace"
-echo "selected: $selected - $selected_name"
-echo "session exists?: $(has_session "$selected_name")"
-
 if [[ -z $TMUX ]] && [[ -z $tmux_running ]]; then
     tmux new-session -ds "$selected_name" -c "$selected"
     hydrate "$selected_name" "$selected"
