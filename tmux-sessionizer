@@ -12,6 +12,7 @@ CONFIG_FILE="$CONFIG_DIR/tmux-sessionizer.conf"
 # TS_EXTRA_SEARCH_PATHS=(~/ghq:3 ~/Git:3 ~/.config:2)
 # # if set this override the TS_MAX_DEPTH (1)
 # TS_MAX_DEPTH=2
+# TS_WORKSPACE_COMMAND=<cmd>
 # ------------------------
 
 # test if the config file exists
@@ -19,6 +20,43 @@ if [[ -f "$CONFIG_FILE" ]]; then
     # shellcheck source=/dev/null
     source "$CONFIG_FILE"
 fi
+
+workspace=""
+VERSION="0.1.0"
+
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+    -h | --help)
+        echo "Usage: tmux-sessionizer [OPTIONS] [SEARCH_PATH]"
+        echo "Options:"
+        echo "  -h, --help             Display this help message"
+        echo "  -w, --workspace <name> Namespace to the sessionizer.  Empty by default.  --workspace one is equivalent to empty"
+        exit 0
+        ;;
+    -w | --workspace)
+        workspace="$2"
+        if [[ -z $workspace ]]; then
+            echo "Workspace name cannot be empty"
+            exit 1
+        fi
+
+        if [[ -z $TS_WORKSPACE_COMMAND ]]; then
+            echo "TS_WORKSPACE_COMMAND is not set.  Must have a command set to run when switching to a workspace"
+            exit 1
+        fi
+
+        shift
+        ;;
+    -v | --version)
+        echo "tmux-sessionizer version $VERSION"
+        exit 0
+        ;;
+    *)
+        workspace="$1"
+        ;;
+    esac
+    shift
+done
 
 sanity_check() {
     if ! command -v tmux &>/dev/null; then
@@ -45,9 +83,14 @@ has_session() {
 }
 
 hydrate() {
-    if [ -f "$2/.tmux-sessionizer" ]; then
+    if [[ ! -z $workspace ]]; then
+        echo "Hydrating workspace: $workspace"
+        tmux send-keys -t "$1" "$TS_WORKSPACE_COMMAND" c-M
+    elif [ -f "$2/.tmux-sessionizer" ]; then
+        echo "Hydrating session: $2"
         tmux send-keys -t "$1" "source $2/.tmux-sessionizer" c-M
     elif [ -f "$HOME/.tmux-sessionizer" ]; then
+        echo "Hydrating session: $HOME/.tmux-sessionizer"
         tmux send-keys -t "$1" "source $HOME/.tmux-sessionizer" c-M
     fi
 }
@@ -93,6 +136,8 @@ find_dirs() {
 
 if [[ $# -eq 1 ]]; then
     selected="$1"
+elif [[ ! -z $workspace ]]; then
+    selected=$(pwd)
 else
     selected=$(find_dirs | fzf)
 fi
@@ -107,6 +152,16 @@ fi
 
 selected_name=$(basename "$selected" | tr . _)
 tmux_running=$(pgrep tmux)
+
+if [[ ! -z $workspace ]]; then
+    if [[ $workspace != "one" ]]; then
+        selected_name="${selected_name}_${workspace}"
+    fi
+fi
+
+echo "workspace: $workspace"
+echo "selected: $selected - $selected_name"
+echo "session exists?: $(has_session "$selected_name")"
 
 if [[ -z $TMUX ]] && [[ -z $tmux_running ]]; then
     tmux new-session -ds "$selected_name" -c "$selected"
