@@ -127,8 +127,8 @@ has_session() {
 
 hydrate() {
     if [[ ! -z $session_cmd ]]; then
-        log "running session command $session_cmd"
-        tmux send-keys -t "$1" "$session_cmd" c-M
+        log "target: $1 command $session_cmd"
+        tmux send-keys -t "$1" "$session_cmd"
     elif [ -f "$2/.tmux-sessionizer" ]; then
         log "sourcing(local) $2/.tmux-sessionizer"
         tmux send-keys -t "$1" "source $2/.tmux-sessionizer" c-M
@@ -200,7 +200,9 @@ handle_session_cmd() {
     if tmux has-session -t="$target"; then
         switch_to "$target"
     else
-        tmux neww -t $target $session_cmd
+        tmux neww -dt $target
+        hydrate "$target" "$selected"
+        tmux select-window -t $target
     fi
     exit 0
 }
