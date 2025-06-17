@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
+CONFIG_FILE_NAME="tmux-sessionizer.conf"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/tmux-sessionizer"
-CONFIG_FILE="$CONFIG_DIR/tmux-sessionizer.conf"
+CONFIG_FILE="$CONFIG_DIR/$CONFIG_FILE_NAME"
 
 # config file example
 # ------------------------
@@ -30,6 +31,10 @@ CONFIG_FILE="$CONFIG_DIR/tmux-sessionizer.conf"
 
 if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE"
+fi
+
+if [[ -f "$CONFIG_FILE_NAME" ]]; then
+    source "$CONFIG_FILE_NAME"
 fi
 
 if [[ $TS_LOG != "true" ]]; then
