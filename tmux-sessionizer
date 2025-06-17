@@ -12,7 +12,17 @@ CONFIG_FILE="$CONFIG_DIR/tmux-sessionizer.conf"
 # TS_EXTRA_SEARCH_PATHS=(~/ghq:3 ~/Git:3 ~/.config:2)
 # # if set this override the TS_MAX_DEPTH (1)
 # TS_MAX_DEPTH=2
-# TS_WORKSPACE_COMMAND=<cmd>
+# This is not meant to override .tmux-sessionizer.  At first i thought this
+# would be a good command, but i don't think its ackshually what i want.
+#
+# Instead, its a list of commands to run on windows who's index is way outside
+# of the first 10 windows.  This allows you to create as many windows in your
+# session as you would like without having your workflow interrupted by these
+# programatic windows
+#
+# how to use:
+# tmux-sessionizer -w 0 will execute the first command in window -t 69.
+# TS_SESSION_COMMANDS=(<cmd1> <cmd2>)
 # ------------------------
 
 # test if the config file exists
@@ -21,7 +31,9 @@ if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE"
 fi
 
-workspace=""
+session_idx=""
+session_cmd=""
+user_selected=""
 VERSION="0.1.0"
 
 while [[ "$#" -gt 0 ]]; do
@@ -30,20 +42,27 @@ while [[ "$#" -gt 0 ]]; do
         echo "Usage: tmux-sessionizer [OPTIONS] [SEARCH_PATH]"
         echo "Options:"
         echo "  -h, --help             Display this help message"
-        echo "  -w, --workspace <name> Namespace to the sessionizer.  Empty by default.  --workspace one is equivalent to empty"
+        echo "  -s, --session <name>   session command index."
         exit 0
         ;;
-    -w | --workspace)
-        workspace="$2"
-        if [[ -z $workspace ]]; then
-            echo "Workspace name cannot be empty"
+    -w | --session)
+        session_idx="$2"
+        if [[ -z $session_idx ]]; then
+            echo "Session index cannot be empty"
             exit 1
         fi
 
-        if [[ -z $TS_WORKSPACE_COMMAND ]]; then
-            echo "TS_WORKSPACE_COMMAND is not set.  Must have a command set to run when switching to a workspace"
+        if [[ -z $TS_SESSION_COMMANDS ]]; then
+            echo "TS_SESSION_COMMANDS is not set.  Must have a command set to run when switching to a session"
             exit 1
         fi
+
+        if [[ -z "$session_idx" || "$session_idx" -lt 0 || "$session_idx" -ge "${#TS_SESSION_COMMANDS[@]}" ]]; then
+            echo "Error: Invalid index. Please provide an index between 0 and $((${#TS_SESSION_COMMANDS[@]} - 1))."
+            exit 1
+        fi
+
+        session_cmd="${TS_SESSION_COMMANDS[$session_idx]}"
 
         shift
         ;;
@@ -52,7 +71,7 @@ while [[ "$#" -gt 0 ]]; do
         exit 0
         ;;
     *)
-        workspace="$1"
+        user_selected="$1"
         ;;
     esac
     shift
@@ -83,16 +102,22 @@ has_session() {
 }
 
 hydrate() {
-    if [[ ! -z $workspace ]]; then
-        echo "Hydrating workspace: $workspace"
-        tmux send-keys -t "$1" "$TS_WORKSPACE_COMMAND" c-M
+    if [[ ! -z $session_cmd ]]; then
+        tmux send-keys -t "$1" "$TS_SESSION_COMMANDS" c-M
     elif [ -f "$2/.tmux-sessionizer" ]; then
-        echo "Hydrating session: $2"
         tmux send-keys -t "$1" "source $2/.tmux-sessionizer" c-M
     elif [ -f "$HOME/.tmux-sessionizer" ]; then
-        echo "Hydrating session: $HOME/.tmux-sessionizer"
         tmux send-keys -t "$1" "source $HOME/.tmux-sessionizer" c-M
     fi
+}
+
+is_tmux_running() {
+    tmux_running=$(pgrep tmux)
+
+    if [[ -z $TMUX ]] && [[ -z $tmux_running ]]; then
+        return 1
+    fi
+    return 0
 }
 
 sanity_check
@@ -134,10 +159,28 @@ find_dirs() {
     done
 }
 
-if [[ $# -eq 1 ]]; then
-    selected="$1"
-elif [[ ! -z $workspace ]]; then
-    selected=$(pwd)
+handle_session_cmd() {
+    if ! is_tmux_running; then
+        echo "Error: tmux is not running.  Please start tmux first before using session commands."
+        exit 1
+    fi
+
+    start_index=$((69 + $session_idx))
+    current_session=$(tmux display-message -p '#S')
+    target="$current_session:$start_index"
+
+    if tmux has-session -t="$target"; then
+        switch_to "$target"
+    else
+        tmux neww -t $target $session_cmd
+    fi
+    exit 0
+}
+
+if [[ ! -z $session_cmd ]]; then
+    handle_session_cmd
+elif [[ ! -z $user_selected ]]; then
+    selected="$user_selected"
 else
     selected=$(find_dirs | fzf)
 fi
@@ -153,13 +196,7 @@ fi
 selected_name=$(basename "$selected" | tr . _)
 tmux_running=$(pgrep tmux)
 
-if [[ ! -z $workspace ]]; then
-    if [[ $workspace != "one" ]]; then
-        selected_name="${selected_name}_${workspace}"
-    fi
-fi
-
-if [[ -z $TMUX ]] && [[ -z $tmux_running ]]; then
+if ! is_tmux_running; then
     tmux new-session -ds "$selected_name" -c "$selected"
     hydrate "$selected_name" "$selected"
 fi
