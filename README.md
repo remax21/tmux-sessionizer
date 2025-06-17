@@ -64,3 +64,12 @@ bind-key -r M-t run-shell "tmux neww tmux-sessionizer -s 1"
 bind-key -r M-n run-shell "tmux neww tmux-sessionizer -s 2"
 bind-key -r M-s run-shell "tmux neww tmux-sessionizer -s 3"
 ```
+
+## Enable Logs
+This is for debugging purposes.
+
+```bash
+# file: ~/.config/tmux-sessionizer/tmux-sessionizer.conf
+TS_LOG=file | echo # echo will echo to stdout, file will write to TS_LOG_FILE
+TS_LOG_FILE=<file> # will write logs to <file> Defaults to ~/.local/share/tmux-sessionizer/tmux-sessionizer.logs
+```
