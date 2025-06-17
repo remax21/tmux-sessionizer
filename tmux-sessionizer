@@ -128,7 +128,7 @@ has_session() {
 hydrate() {
     if [[ ! -z $session_cmd ]]; then
         log "target: $1 command $session_cmd"
-        tmux send-keys -t "$1" "$session_cmd"
+        tmux send-keys -t "$1" "$session_cmd" c-M
     elif [ -f "$2/.tmux-sessionizer" ]; then
         log "sourcing(local) $2/.tmux-sessionizer"
         tmux send-keys -t "$1" "source $2/.tmux-sessionizer" c-M
