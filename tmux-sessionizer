@@ -45,7 +45,6 @@ if [[ $TS_LOG != "true" ]]; then
     mkdir -p "$(dirname "$TS_LOG_FILE")"
 fi
 
-
 log() {
     if [[ -z $TS_LOG ]]; then
         return
@@ -132,8 +131,8 @@ has_session() {
 
 hydrate() {
     if [[ ! -z $session_cmd ]]; then
-        log "target: $1 command $session_cmd"
-        tmux send-keys -t "$1" "$session_cmd" c-M
+        log "skipping hydrate for $1 -- using \"$session_cmd\" instead"
+        return
     elif [ -f "$2/.tmux-sessionizer" ]; then
         log "sourcing(local) $2/.tmux-sessionizer"
         tmux send-keys -t "$1" "source $2/.tmux-sessionizer" c-M
@@ -208,7 +207,7 @@ handle_session_cmd() {
     else
         log "executing session command: tmux neww -dt $target $session_cmd"
         tmux neww -dt $target "$session_cmd"
-        # hydrate "$target" "$selected"
+        hydrate "$target" "$selected"
         tmux select-window -t $target
     fi
     exit 0
