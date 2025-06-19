@@ -202,11 +202,13 @@ handle_session_cmd() {
     current_session=$(tmux display-message -p '#S')
     target="$current_session:$start_index"
 
-    if tmux has-session -t="$target"; then
+    log "target: $target command $session_cmd has-session=$(tmux has-session -t="$target" 2> /dev/null)"
+    if tmux has-session -t="$target" 2> /dev/null; then
         switch_to "$target"
     else
-        tmux neww -dt $target
-        hydrate "$target" "$selected"
+        log "executing session command: tmux neww -dt $target $session_cmd"
+        tmux neww -dt $target "$session_cmd"
+        # hydrate "$target" "$selected"
         tmux select-window -t $target
     fi
     exit 0
